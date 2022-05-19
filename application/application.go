@@ -1,6 +1,9 @@
 package application
 
-import "math"
+import (
+	"log"
+	"math"
+)
 
 type Application struct {
 	discounter Discounter
@@ -11,6 +14,9 @@ type Discounter interface {
 
 func New(discounter Discounter) *Application {
 
+	if discounter == nil {
+		panic("Discounter cannot be nil")
+	}
 	return &Application{
 		discounter: discounter,
 	}
@@ -19,6 +25,6 @@ func New(discounter Discounter) *Application {
 func (a *Application) Discount(amount float32) float32 {
 
 	rate := a.discounter.Rate(amount)
-
-	return float32(math.Round(float64(amount*rate*100)/100)) * rate
+	log.Printf("Rate from discounter: %f", rate)
+	return float32(math.Round(float64(amount*rate*100) / 100))
 }
