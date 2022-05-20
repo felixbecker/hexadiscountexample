@@ -54,7 +54,6 @@ type Factory struct {
 
 func NewFactory(config *Config) *Factory {
 
-	fmt.Println(config)
 	return &Factory{
 		config: config,
 	}
@@ -66,7 +65,7 @@ func (f *Factory) Store() *store.Store {
 
 		var p store.Provider
 		switch f.config.StoreType {
-		case "inMemory":
+		case "inmemory":
 			p = storeprovider.NewInMemory()
 		case "postgres":
 			err := f.config.Postgres.Validate()

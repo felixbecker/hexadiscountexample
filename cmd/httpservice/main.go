@@ -7,21 +7,22 @@ import (
 
 	"github.com/felixbecker/hexadiscountexample/api"
 	"github.com/felixbecker/hexadiscountexample/application"
+	internal "github.com/felixbecker/hexadiscountexample/internal/factory"
 	"github.com/felixbecker/hexadiscountexample/web"
 )
-
-type fakeDiscounter struct{}
-
-func (f *fakeDiscounter) Rate(amount float32) float32 {
-
-	return 1
-}
 
 func main() {
 
 	fmt.Println("Hello http service")
 
-	app := application.New(&fakeDiscounter{})
+	config := internal.Config{
+		StoreType: "inmemory",
+		Redis: internal.Redis{
+			Addr: "localhost:6379",
+		},
+	}
+	factory := internal.NewFactory(&config)
+	app := application.New(factory.Discounter())
 	ui := web.New(app)
 	api := api.New(app)
 
