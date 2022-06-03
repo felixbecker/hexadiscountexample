@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 
 	"github.com/felixbecker/hexadiscountexample/cli"
@@ -9,23 +10,11 @@ import (
 
 func main() {
 
-	dbUser := os.Getenv("DB_USER")
-	dbPW := os.Getenv("DB_PW")
-	config := internal.Config{
-		StoreType: "postgres",
-		Redis: internal.Redis{
-			Addr: "localhost:6379",
-		},
-		Postgres: internal.Postgres{
-			User:      dbUser,
-			Password:  dbPW,
-			Host:      "localhost:5432",
-			DB:        "discounter",
-			Tablename: "rates",
-		},
+	factory, err := internal.NewFactory()
+	if err != nil {
+		log.Println(err)
+		os.Exit(1)
 	}
-
-	factory := internal.NewFactory(&config)
 	commandLine := cli.New(factory.Application())
 	commandLine.Execute()
 }

@@ -1,33 +1,43 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/felixbecker/hexadiscountexample/application"
 	"github.com/felixbecker/hexadiscountexample/discounter"
 	"github.com/felixbecker/hexadiscountexample/store"
 	"github.com/felixbecker/hexadiscountexample/storeprovider"
+	"github.com/joho/godotenv"
+	"github.com/sethvargo/go-envconfig"
+)
+
+var (
+	ErrNoRedisAdr               string = "Please provide configuration settigns for the redis [addr = address:port]"
+	ErrNoPostgresConfigSettings string = "Error: Please provide configuration settigns for the postgres db [user, password, host, db, table name ]"
 )
 
 type Redis struct {
-	Addr string
+	Addr string `env:"REDIS_ADDR,default=localhost:6379"`
 }
 
 func (r *Redis) Validate() error {
 
 	if r.Addr == "" {
-		return fmt.Errorf("Please provide configuration settigns for the redis [addr = address:port]")
+		return fmt.Errorf(ErrNoRedisAdr)
 	}
 	return nil
 }
 
 type Postgres struct {
-	User      string
-	Password  string
-	Host      string
-	DB        string
-	Tablename string
+	User      string `env:"POSTGRES_USER"`
+	Password  string `env:"POSTGRES_PASSWORD"`
+	Host      string `env:"POSTGRES_HOST"`
+	DB        string `env:"POSTGRES_DB,default=discounter"`
+	Tablename string `env:"POSTGRES_TABLE,default=rates"`
 }
 
 func (p *Postgres) Validate() error {
@@ -35,11 +45,12 @@ func (p *Postgres) Validate() error {
 	if p.User != "" && p.Password != "" && p.Host != "" && p.DB != "" && p.Tablename != "" {
 		return nil
 	}
-	return fmt.Errorf("Error: Please provide configuration settigns for the postgres db [user, password, host, db, table name ]")
+	return fmt.Errorf(ErrNoPostgresConfigSettings)
 }
 
 type Config struct {
-	StoreType string
+	ENV       string `env:"ENV,default=development"`
+	StoreType string `env:"STORE_TYPE,default=inmemory"`
 	Redis     Redis
 	Postgres  Postgres
 }
@@ -52,11 +63,37 @@ type Factory struct {
 	application *application.Application
 }
 
-func NewFactory(config *Config) *Factory {
+func NewFactory() (*Factory, error) {
+	var config Config
+	const EnvDevelopment = "development"
 
-	return &Factory{
-		config: config,
+	env := os.Getenv("ENV")
+	if env == "" {
+		env = EnvDevelopment
 	}
+
+	env = strings.ToLower(env)
+	config.ENV = env
+
+	log.Printf("Figured out your are running in %s env", config.ENV)
+	_ = godotenv.Load(".env." + env + ".local")
+
+	if env != "test" {
+		_ = godotenv.Load(".env.local")
+	}
+	_ = godotenv.Load(".env." + env)
+	_ = godotenv.Load(".env")
+	_ = godotenv.Load()
+
+	err := envconfig.Process(context.Background(), &config)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(config)
+	return &Factory{
+		config: &config,
+	}, nil
 }
 
 func (f *Factory) Store() *store.Store {
@@ -67,6 +104,7 @@ func (f *Factory) Store() *store.Store {
 		switch f.config.StoreType {
 		case "inmemory":
 			p = storeprovider.NewInMemory()
+			log.Println("Assigned InMemory Store")
 		case "postgres":
 			err := f.config.Postgres.Validate()
 			if err != nil {
@@ -80,12 +118,14 @@ func (f *Factory) Store() *store.Store {
 			if err != nil {
 				panic(err)
 			}
+			log.Println("Assigned Postgres Store")
 		case "redis":
 			err := f.config.Redis.Validate()
 			if err != nil {
 				panic(err)
 			}
 			p = storeprovider.NewRedisProvider(f.config.Redis.Addr)
+			log.Println("Assigned Redis Store")
 
 		default:
 			log.Println("Not a valid store type")
